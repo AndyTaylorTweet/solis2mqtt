@@ -1,0 +1,11 @@
+[Unit]
+Description=Python Service: solis2mqtt
+Wants=emoncms_mqtt.service
+After=emoncms_mqtt.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/solis2mqtt/solis2mqtt.py
+StandardInput=tty-force
+Restart=always
+RestartSec=20s
