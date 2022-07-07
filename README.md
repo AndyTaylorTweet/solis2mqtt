@@ -32,7 +32,7 @@ his "pysolarmanv5" module here: https://github.com/jmccrohan/pysolarmanv5
 
 ```
 sudo git clone https://git.always-online.uk/ataylor/Solis2MQTT.git /opt/solis2mqtt
-(cd /etc/system/systemd; sudo ln -s /opt/solis2mqtt/solis2mqtt.service ./)
+(cd /etc/systemd/system; sudo ln -s /opt/solis2mqtt/solis2mqtt.service ./)
 (cd /opt/solis2mqtt; pip3 install -r requirements.txt)
 sudo systemctl daemon-reload
 sudo systemctl enable solis2mqtt
