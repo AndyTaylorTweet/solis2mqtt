@@ -38,9 +38,6 @@ def collect():
       logging.info('Connecting to MQTT Server')
     mqttc = mqtt.Client()
     mqttc.username_pw_set(MQTT_USER, MQTT_PASS)
-    mqttc.connect(MQTT_SERVER, MQTT_PORT, MQTT_KEEPALIVE)
-    if debug:
-      mqttc.on_connect = logging.info("Connected to MQTT " + MQTT_SERVER + ":" + str(MQTT_PORT))
 
     # Connect to MODBUS
     modbus = PySolarmanV5(MODBUS_SERVER, MODBUS_DONGLEID, port=MODBUS_PORT, mb_slave_id=MODBUS_ID, verbose=0)
@@ -90,20 +87,36 @@ def collect():
       print("Inverter Load     : ", repr(INV_LOAD))
       #print("Sys Temp          : ", repr(SYS_TEMP))
 
+    # For the absesnse of doubt, I reaslise how dumb this looks to connect
+    # publish one topic and disconnect, but something in paho-mqtt changed
+    # that has made this a requirement :(
+    mqttc.connect(MQTT_SERVER, MQTT_PORT, MQTT_KEEPALIVE)
     mqttc.publish(MQTT_TOPIC + '/' + 'battery_soc', repr(BATTERY_SOC))
-    mqttc.publish(MQTT_TOPIC + '/' + 'battery_discharge',repr(BATTERY_DISCHARGE))
-    mqttc.publish(MQTT_TOPIC + '/' + 'battery_charge', repr(BATTERY_CHARGE))
-    mqttc.publish(MQTT_TOPIC + '/' + 'pv_voltage', repr(PV_VOLTS))
-    mqttc.publish(MQTT_TOPIC + '/' + 'pv_current', repr(PV_AMPS))
-    mqttc.publish(MQTT_TOPIC + '/' + 'pv_power', repr(PV_POWER))
-    mqttc.publish(MQTT_TOPIC + '/' + 'grid_power', repr(GRID_POWER))
-    mqttc.publish(MQTT_TOPIC + '/' + 'inv_power', repr(INV_POWER))
-    mqttc.publish(MQTT_TOPIC + '/' + 'inv_load', repr(INV_LOAD))
-
-    # Close connections and wrap up
     mqttc.disconnect()
-    if debug:
-      logging.info('Reading MODBUS - Complete')
+    mqttc.connect(MQTT_SERVER, MQTT_PORT, MQTT_KEEPALIVE)
+    mqttc.publish(MQTT_TOPIC + '/' + 'battery_discharge',repr(BATTERY_DISCHARGE))
+    mqttc.disconnect()
+    mqttc.connect(MQTT_SERVER, MQTT_PORT, MQTT_KEEPALIVE)
+    mqttc.publish(MQTT_TOPIC + '/' + 'battery_charge', repr(BATTERY_CHARGE))
+    mqttc.disconnect()
+    mqttc.connect(MQTT_SERVER, MQTT_PORT, MQTT_KEEPALIVE)
+    mqttc.publish(MQTT_TOPIC + '/' + 'pv_voltage', repr(PV_VOLTS))
+    mqttc.disconnect()
+    mqttc.connect(MQTT_SERVER, MQTT_PORT, MQTT_KEEPALIVE)
+    mqttc.publish(MQTT_TOPIC + '/' + 'pv_current', repr(PV_AMPS))
+    mqttc.disconnect()
+    mqttc.connect(MQTT_SERVER, MQTT_PORT, MQTT_KEEPALIVE)
+    mqttc.publish(MQTT_TOPIC + '/' + 'pv_power', repr(PV_POWER))
+    mqttc.disconnect()
+    mqttc.connect(MQTT_SERVER, MQTT_PORT, MQTT_KEEPALIVE)
+    mqttc.publish(MQTT_TOPIC + '/' + 'grid_power', repr(GRID_POWER))
+    mqttc.disconnect()
+    mqttc.connect(MQTT_SERVER, MQTT_PORT, MQTT_KEEPALIVE)
+    mqttc.publish(MQTT_TOPIC + '/' + 'inv_power', repr(INV_POWER))
+    mqttc.disconnect()
+    mqttc.connect(MQTT_SERVER, MQTT_PORT, MQTT_KEEPALIVE)
+    mqttc.publish(MQTT_TOPIC + '/' + 'inv_load', repr(INV_LOAD))
+    mqttc.disconnect()
 
   except Exception:
     logging.error('Unable to read data from MODBUS')
