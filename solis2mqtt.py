@@ -90,9 +90,11 @@ def collect():
     # For the absesnse of doubt, I reaslise how dumb this looks to connect
     # publish one topic and disconnect, but something in paho-mqtt changed
     # that has made this a requirement :(
-    mqttc.connect(MQTT_SERVER, MQTT_PORT, MQTT_KEEPALIVE)
-    mqttc.publish(MQTT_TOPIC + '/' + 'battery_soc', repr(BATTERY_SOC))
-    mqttc.disconnect()
+    if isinstance(BATTERY_SOC, (int, float)) and 0 <= BATTERY_SOC <= 100:
+      # Let's only log sane values shall we
+      mqttc.connect(MQTT_SERVER, MQTT_PORT, MQTT_KEEPALIVE)
+      mqttc.publish(MQTT_TOPIC + '/' + 'battery_soc', repr(BATTERY_SOC))
+      mqttc.disconnect()
     mqttc.connect(MQTT_SERVER, MQTT_PORT, MQTT_KEEPALIVE)
     mqttc.publish(MQTT_TOPIC + '/' + 'battery_discharge',repr(BATTERY_DISCHARGE))
     mqttc.disconnect()
