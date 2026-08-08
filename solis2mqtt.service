@@ -1,0 +1,34 @@
+[Unit]
+Description=Python Service: solis2mqtt
+Documentation=https://github.com/AndyTaylorTweet/solis2mqtt
+Wants=network-online.target emoncms_mqtt.service
+After=network-online.target emoncms_mqtt.service mosquitto.service
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/opt/solis2mqtt
+ExecStart=/opt/solis2mqtt/.venv/bin/python /opt/solis2mqtt/solis2mqtt.py
+Restart=always
+RestartSec=20s
+
+# Unbuffered so log lines reach the journal as they happen.
+Environment=PYTHONUNBUFFERED=1
+
+# This talks to one TCP port and reads its own config; it needs nothing else.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,8 @@
+# Local configuration -- contains the dongle serial and MQTT password.
+config.yaml
+
+# Virtualenv created by install.sh
+.venv/
+
+__pycache__/
+*.py[cod]

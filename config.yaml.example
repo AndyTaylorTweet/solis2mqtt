@@ -1,0 +1,36 @@
+# solis2mqtt configuration.
+#
+# Copy this to config.yaml and edit it. config.yaml is gitignored so your
+# serial number and MQTT password stay out of the repository.
+
+modbus:
+  # IP address of the Solis WiFi stick.
+  host: 1.2.3.4
+  # "Device serial number" from the stick's web dashboard, under
+  # "Device information".
+  serial: 1234567890
+  port: 8899
+  slave_id: 1
+  # Seconds to wait for a modbus response before treating it as failed.
+  timeout: 10
+
+mqtt:
+  host: 127.0.0.1
+  port: 1883
+  # Defaults below are the stock emonPi credentials; change them if yours
+  # have been changed.
+  user: emonpi
+  password: emonpimqtt2016
+  # Readings are published as <topic>/<name>, e.g. emon/solis/battery_soc.
+  topic: emon/solis
+  keepalive: 60
+  # Retained online/offline topic. Deliberately outside the emon/ tree so
+  # emoncms does not pick it up as an input. Set to null to disable.
+  status_topic: solis2mqtt/status
+
+# Seconds between polls. 11 is a good balance between local resolution and
+# leaving the dongle enough room to report to the Solis cloud.
+poll_interval: 11
+
+# DEBUG, INFO, WARNING or ERROR.
+log_level: INFO
