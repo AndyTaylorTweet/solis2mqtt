@@ -106,10 +106,12 @@ the readings up as inputs on a node called `solis`.
 | `battery_soc` | % | |
 | `battery_voltage` / `battery_current` | V / A | |
 | `battery_power` | W | Unsigned magnitude |
-| `battery_status` | | 0 = charging, 1 = discharging |
-| `battery_charge` / `battery_discharge` | W | Derived from status; the inactive one reads 0 |
-| `battery_power_signed` | W | Derived: positive charging, negative discharging |
+| `battery_charge` / `battery_discharge` | W | The inactive one reads 0 |
+| `battery_power_signed` | W | Positive charging, negative discharging |
 | `sys_temp` | °C | Inverter temperature |
+
+Which way the battery is going comes from a register that is read but not published, since
+`battery_charge`, `battery_discharge` and `battery_power_signed` already say the same thing.
 
 A retained `solis2mqtt/status` topic carries `online` / `offline`, with `offline` also set as the  
 MQTT last will so an unclean exit is visible. It sits outside the `emon/` tree deliberately, so  
@@ -117,6 +119,20 @@ emoncms does not create an input for it.
 
 Readings that fall outside a plausible range for that metric are dropped with a warning rather than  
 published, so a garbled read cannot poison a feed.  
+
+Everything is published so you can pick what to keep. Log to a feed only what you actually want  
+graphed; the rest are still there to look at live on the Inputs page. What I log:  
+
+| Input | Feed |
+| --- | --- |
+| `pv_power` | power, and kWh |
+| `inv_power` | power, and kWh |
+| `grid_power` | power, kWh, and split into import and export |
+| `battery_soc` | level |
+| `battery_power` | power |
+| `battery_charge` / `battery_discharge` | power, and kWh each |
+
+Feeds only start from the moment you add the processing, so there is no backfill.  
 
 
 ## Switching the inverter on and off

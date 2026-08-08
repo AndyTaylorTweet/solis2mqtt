@@ -31,9 +31,12 @@ class Register:
     scale   multiplier applied to the raw value
     signed  interpret the combined raw value as two's complement
     sane    (min, max) plausible range; readings outside it are discarded
+    publish False for a register we only read in order to derive something
+            else from it, and which is not worth a topic of its own
     """
 
-    def __init__(self, name, addr, words=1, scale=1, signed=False, unit='', sane=None):
+    def __init__(self, name, addr, words=1, scale=1, signed=False, unit='',
+                 sane=None, publish=True):
         self.name = name
         self.addr = addr
         self.words = words
@@ -41,6 +44,7 @@ class Register:
         self.signed = signed
         self.unit = unit
         self.sane = sane
+        self.publish = publish
 
     def decode(self, block_start, words):
         """Pull this register's value out of an already-read block."""
@@ -77,7 +81,9 @@ BLOCKS = [
     ]),
     (33130, 21, [
         Register('grid_power',      33130, 2, 1, signed=True, unit='W', sane=(-100000, 100000)),
-        Register('battery_status',  33135, 1, 1, sane=(0, 1)),
+        # Only tells us which way the battery is going; battery_charge,
+        # battery_discharge and battery_power_signed carry that already.
+        Register('battery_status',  33135, 1, 1, sane=(0, 1), publish=False),
         Register('battery_soc',     33139, 1, 1, unit='%', sane=(0, 100)),
         Register('battery_voltage', 33141, 1, 0.01, unit='V', sane=(0, 1000)),
         Register('battery_current', 33142, 1, 0.1, unit='A', sane=(0, 1000)),
@@ -85,6 +91,13 @@ BLOCKS = [
         Register('battery_power',   33149, 2, 1, unit='W', sane=(0, 100000)),
     ]),
 ]
+
+
+# Read to derive other values from, but not published.
+INTERNAL = {register.name
+            for _, _, registers in BLOCKS
+            for register in registers
+            if not register.publish}
 
 
 class TransientError(Exception):
@@ -145,6 +158,8 @@ class Inverter:
 
         Values that fall outside their plausible range are dropped, so a
         garbled read publishes nothing rather than poisoning a feed.
+        Registers marked publish=False are used to derive other values and
+        then dropped from the result.
         """
         readings = {}
         for index, (start, quantity, registers) in enumerate(BLOCKS):
@@ -160,7 +175,9 @@ class Inverter:
                 else:
                     log.warning('Discarding implausible %s reading: %s%s',
                                 register.name, value, register.unit)
-        return add_derived(readings)
+        readings = add_derived(readings)
+        return {name: value for name, value in readings.items()
+                if name not in INTERNAL}
 
 
 def add_derived(readings):
