@@ -173,5 +173,10 @@ covers its address:
 Register('battery_soh', 33140, 1, 1, unit='%', sane=(0, 100))
 ```
 
-Reading a block wider than about 100 registers, or one spanning the gap between the two existing  
-blocks, is rejected by the inverter with `IllegalDataAddressError`.  
+The inverter accepts at most 100 registers in a single request. Ask for 101 and it answers  
+`IllegalDataAddressError`, which is misleading: the addresses are fine, the count is not.  
+
+The registers you want do not need to be adjacent. A request spanning unused registers costs the  
+same as one that does not, so it is nearly always cheaper to read a wide block and ignore the gaps  
+than to issue a request per value. There are two blocks here only because `battery_power` sits at  
+33149, and reaching it from 33049 would need 102 registers.  
