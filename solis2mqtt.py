@@ -136,9 +136,38 @@ class Service:
         self.publisher.publish(readings)
         log.debug('Published %s readings', len(readings))
 
+    def identify(self):
+        """Log what we are talking to. False if we should not start."""
+        try:
+            info = self.inverter.identify()
+        except solis.UnsupportedInverter as err:
+            log.error('Refusing to start: %s', err)
+            log.error('These register addresses belong to the Solis energy '
+                      'storage protocol. On this inverter they point at '
+                      'something else, so every reading would be nonsense.')
+            return False
+        except solis.TransientError as err:
+            # Being unable to ask is not the same as being told no, and a
+            # busy dongle at boot should not stop the service.
+            log.warning('Could not read the inverter type (%s), continuing '
+                        'without checking it', err)
+            return True
+
+        log.info('Inverter: %s, %s protocol (0x%04X)%s',
+                 info['model_name'], info['protocol_name'], info['raw'],
+                 ', serial %s' % info['serial'] if info['serial'] else '')
+        if info['model'] != solis.VERIFIED_MODEL:
+            log.warning('The register map has only been verified against the '
+                        '%s model; check these readings look sane.',
+                        solis.MODELS.get(solis.VERIFIED_MODEL))
+        return True
+
     def run(self):
         signal.signal(signal.SIGTERM, self.shutdown)
         signal.signal(signal.SIGINT, self.shutdown)
+
+        if not self.identify():
+            return 3
 
         self.publisher.start()
         interval = self.cfg['poll_interval']

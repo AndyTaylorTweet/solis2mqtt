@@ -67,17 +67,27 @@ class Register:
 
 
 # Contiguous blocks to read. Each is (start, quantity, [registers]).
-# Both ranges were verified against the inverter; reading the whole
-# 33049-33150 span in one go is rejected with IllegalDataAddress.
+# The inverter takes at most 100 registers per request and answers
+# IllegalDataAddressError for more, which is why battery_power at 33149
+# needs a second block rather than one wide read from 33029.
 BLOCKS = [
-    (33049, 45, [
-        Register('pv_voltage',   33049, 1, 0.1, unit='V', sane=(0, 1000)),
-        Register('pv_current',   33050, 1, 0.1, unit='A', sane=(0, 100)),
-        Register('pv2_voltage',  33051, 1, 0.1, unit='V', sane=(0, 1000)),
-        Register('pv2_current',  33052, 1, 0.1, unit='A', sane=(0, 100)),
-        Register('pv_power',     33057, 2, 1, unit='W', sane=(0, 100000)),
-        Register('inv_power',    33079, 2, 1, signed=True, unit='W', sane=(-100000, 100000)),
-        Register('sys_temp',     33093, 1, 0.1, unit='C', sane=(-40, 150)),
+    (33029, 66, [
+        Register('energy_total',      33029, 2, 1, unit='kWh', sane=(0, 10000000)),
+        Register('energy_this_month', 33031, 2, 1, unit='kWh', sane=(0, 1000000)),
+        Register('energy_last_month', 33033, 2, 1, unit='kWh', sane=(0, 1000000)),
+        Register('energy_today',      33035, 1, 0.1, unit='kWh', sane=(0, 1000)),
+        Register('energy_yesterday',  33036, 1, 0.1, unit='kWh', sane=(0, 1000)),
+        Register('energy_this_year',  33037, 2, 1, unit='kWh', sane=(0, 1000000)),
+        Register('energy_last_year',  33039, 2, 1, unit='kWh', sane=(0, 1000000)),
+        Register('pv_voltage',        33049, 1, 0.1, unit='V', sane=(0, 1000)),
+        Register('pv_current',        33050, 1, 0.1, unit='A', sane=(0, 100)),
+        Register('pv2_voltage',       33051, 1, 0.1, unit='V', sane=(0, 1000)),
+        Register('pv2_current',       33052, 1, 0.1, unit='A', sane=(0, 100)),
+        Register('pv_power',          33057, 2, 1, unit='W', sane=(0, 100000)),
+        Register('grid_voltage',      33073, 1, 0.1, unit='V', sane=(0, 500)),
+        Register('inv_power',         33079, 2, 1, signed=True, unit='W', sane=(-100000, 100000)),
+        Register('sys_temp',          33093, 1, 0.1, unit='C', sane=(-40, 150)),
+        Register('grid_frequency',    33094, 1, 0.01, unit='Hz', sane=(0, 100)),
     ]),
     (33130, 21, [
         Register('grid_power',      33130, 2, 1, signed=True, unit='W', sane=(-100000, 100000)),
@@ -85,12 +95,38 @@ BLOCKS = [
         # battery_discharge and battery_power_signed carry that already.
         Register('battery_status',  33135, 1, 1, sane=(0, 1), publish=False),
         Register('battery_soc',     33139, 1, 1, unit='%', sane=(0, 100)),
+        Register('battery_soh',     33140, 1, 1, unit='%', sane=(0, 100)),
         Register('battery_voltage', 33141, 1, 0.01, unit='V', sane=(0, 1000)),
         Register('battery_current', 33142, 1, 0.1, unit='A', sane=(0, 1000)),
         Register('inv_load',        33147, 1, 1, unit='W', sane=(0, 100000)),
         Register('battery_power',   33149, 2, 1, unit='W', sane=(0, 100000)),
     ]),
 ]
+
+# Identification, read once at startup rather than every poll.
+# 35000 needs no address offset, and Solis document its codes in hex: the
+# high byte is the protocol the inverter speaks, the low byte the model.
+TYPE_REGISTER = 35000
+SERIAL_REGISTER = 33004
+SERIAL_WORDS = 8
+
+# The register addresses above are the energy storage (ESINV-33000ID)
+# protocol. A string inverter speaks 0x10 and puts entirely different
+# things at these addresses, so its readings would be meaningless.
+PROTOCOL_ENERGY_STORAGE = 0x20
+PROTOCOLS = {
+    0x10: 'string inverter (INV-3000ID / EPM-36000ID)',
+    0x20: 'energy storage (ESINV-33000ID)',
+}
+MODELS = {
+    0x30: '1 phase low voltage energy storage',
+    0x31: '1 phase low voltage AC couple energy storage',
+    0x40: '1 phase high voltage energy storage',
+    0x50: '3 phase low voltage energy storage',
+    0x60: '3 phase high voltage energy storage',
+}
+# The only model this register map has actually been checked against.
+VERIFIED_MODEL = 0x30
 
 
 # Read to derive other values from, but not published.
@@ -102,6 +138,10 @@ INTERNAL = {register.name
 
 class TransientError(Exception):
     """A read failed in a way that is usually worth retrying."""
+
+
+class UnsupportedInverter(Exception):
+    """The inverter does not speak the protocol this register map assumes."""
 
 
 class Inverter:
@@ -152,6 +192,41 @@ class Inverter:
                     time.sleep(retry_delay)
         raise TransientError('read of %s registers at %s failed: %s'
                              % (quantity, start, last_error))
+
+    def identify(self, retries=4, retry_delay=6.0):
+        """Read the model and serial, and check the protocol is one we speak.
+
+        Raises UnsupportedInverter if the inverter reports a protocol
+        other than energy storage, because every address in BLOCKS would
+        then point at something else entirely. A read that simply fails
+        raises TransientError; not being able to ask is not the same as
+        being told no.
+        """
+        raw = self.read_block(TYPE_REGISTER, 1, retries=retries,
+                              retry_delay=retry_delay)[0]
+        protocol, model = raw >> 8, raw & 0xFF
+        info = {
+            'raw': raw,
+            'protocol': protocol,
+            'protocol_name': PROTOCOLS.get(protocol, 'unknown'),
+            'model': model,
+            'model_name': MODELS.get(model, 'unknown'),
+            'serial': None,
+        }
+        if protocol != PROTOCOL_ENERGY_STORAGE:
+            raise UnsupportedInverter(
+                'inverter reports protocol 0x%02X (%s), but this register map is '
+                'for 0x%02X (%s)'
+                % (protocol, info['protocol_name'],
+                   PROTOCOL_ENERGY_STORAGE, PROTOCOLS[PROTOCOL_ENERGY_STORAGE]))
+
+        try:
+            words = self.read_block(SERIAL_REGISTER, SERIAL_WORDS)
+            serial = ''.join(chr(w >> 8) + chr(w & 0xFF) for w in words)
+            info['serial'] = ''.join(c for c in serial if c.isprintable()).strip()
+        except (TransientError, ValueError):
+            pass  # Cosmetic only; not worth failing startup over.
+        return info
 
     def read_all(self, inter_block_delay=0.5):
         """Read every mapped register and return a name -> value dict.

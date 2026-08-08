@@ -108,7 +108,17 @@ the readings up as inputs on a node called `solis`.
 | `battery_power` | W | Unsigned magnitude |
 | `battery_charge` / `battery_discharge` | W | The inactive one reads 0 |
 | `battery_power_signed` | W | Positive charging, negative discharging |
+| `battery_soh` | % | Battery state of health |
+| `grid_voltage` | V | Measured at the inverter |
+| `grid_frequency` | Hz | |
 | `sys_temp` | °C | Inverter temperature |
+| `energy_today` / `energy_yesterday` | kWh | |
+| `energy_this_month` / `energy_last_month` | kWh | |
+| `energy_this_year` / `energy_last_year` | kWh | |
+| `energy_total` | kWh | Lifetime generation |
+
+The energy counters come from the inverter's own totals rather than being integrated from  
+`pv_power`, so they do not drift and they survive an outage of this service.  
 
 A retained `solis2mqtt/status` topic carries `online` / `offline`, with `offline` also set as the  
 MQTT last will so an unclean exit is visible. It sits outside the `emon/` tree deliberately, so  
@@ -161,6 +171,25 @@ balance of working well for both local data and remote monitoring in solis cloud
 milage may vary.  
 
 If polls fail 20 times in a row the service exits so systemd restarts it with a clean slate.  
+
+
+## Supported inverters
+
+At startup the inverter is asked for register 35000, which Solis define as its type: the high byte  
+is the protocol it speaks, the low byte the model. This service reads the energy storage protocol  
+(`ESINV-33000ID`, protocol `0x20`), so it refuses to start against a string inverter, which speaks  
+`0x10` and puts completely different things at these addresses. Better to say so than to fill your  
+feeds with nonsense.  
+
+Verified against `0x2030`, a 1 phase low voltage energy storage inverter. Other energy storage  
+models (`0x31`, `0x40`, `0x50`, `0x60`) will start, with a warning that the map has not been checked  
+against them. If you run one, readings that look wrong are worth reporting.  
+
+The model and serial number are logged at startup:  
+
+```
+INFO Inverter: 1 phase low voltage energy storage, energy storage (ESINV-33000ID) protocol (0x2030), serial 160F5221C1601830
+```
 
 
 ## Adding registers
