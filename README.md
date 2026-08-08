@@ -110,9 +110,6 @@ the readings up as inputs on a node called `solis`.
 | `battery_power_signed` | W | Positive charging, negative discharging |
 | `sys_temp` | °C | Inverter temperature |
 
-Which way the battery is going comes from a register that is read but not published, since
-`battery_charge`, `battery_discharge` and `battery_power_signed` already say the same thing.
-
 A retained `solis2mqtt/status` topic carries `online` / `offline`, with `offline` also set as the  
 MQTT last will so an unclean exit is visible. It sits outside the `emon/` tree deliberately, so  
 emoncms does not create an input for it.  
