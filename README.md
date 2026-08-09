@@ -105,9 +105,8 @@ the readings up as inputs on a node called `solis`.
 | `grid_power` | W | Signed; negative is export |
 | `battery_soc` | % | |
 | `battery_voltage` / `battery_current` | V / A | |
-| `battery_power` | W | Unsigned magnitude |
-| `battery_charge` / `battery_discharge` | W | The inactive one reads 0 |
-| `battery_power_signed` | W | Positive charging, negative discharging |
+| `battery_power` | W | Negative into the battery, positive out of it |
+| `battery_charge` / `battery_discharge` | W | Unsigned; the inactive one reads 0 |
 | `battery_soh` | % | Battery state of health |
 | `grid_voltage` | V | Measured at the inverter |
 | `grid_frequency` | Hz | |

@@ -99,7 +99,10 @@ BLOCKS = [
         Register('battery_voltage', 33141, 1, 0.01, unit='V', sane=(0, 1000)),
         Register('battery_current', 33142, 1, 0.1, unit='A', sane=(0, 1000)),
         Register('inv_load',        33147, 1, 1, unit='W', sane=(0, 100000)),
-        Register('battery_power',   33149, 2, 1, unit='W', sane=(0, 100000)),
+        # Magnitude only; battery_status carries the direction. add_derived
+        # combines the two into the signed battery_power we publish.
+        Register('battery_magnitude', 33149, 2, 1, unit='W', sane=(0, 100000),
+                 publish=False),
     ]),
 ]
 
@@ -257,14 +260,14 @@ class Inverter:
 
 def add_derived(readings):
     """Add the values computed from other readings."""
-    power = readings.get('battery_power')
+    power = readings.get('battery_magnitude')
     status = readings.get('battery_status')
     if power is not None and status is not None:
         charging = status == BATTERY_CHARGING
+        # Sign convention: negative into the battery, positive out of it.
+        readings['battery_power'] = -power if charging else power
         readings['battery_charge'] = power if charging else 0
         readings['battery_discharge'] = 0 if charging else power
-        # Signed convenience value: positive charging, negative discharging.
-        readings['battery_power_signed'] = power if charging else -power
 
     pv1 = readings.get('pv_voltage'), readings.get('pv_current')
     pv2 = readings.get('pv2_voltage'), readings.get('pv2_current')
